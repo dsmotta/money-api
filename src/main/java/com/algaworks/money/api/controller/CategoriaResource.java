@@ -5,8 +5,11 @@ import java.util.List;
 import java.util.Optional;
 
 import javax.servlet.http.HttpServletResponse;
+import javax.validation.Valid;
 
+import org.aspectj.weaver.NewConstructorTypeMunger;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,6 +21,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
+import com.algaworks.money.api.event.RecursoCriadoEvent;
 import com.algaworks.money.api.model.Categoria;
 import com.algaworks.money.api.repository.CategoriaRepository;
 
@@ -28,24 +32,25 @@ public class CategoriaResource {
 	@Autowired
 	private CategoriaRepository categoriaRepository;
 	
+	@Autowired
+	private ApplicationEventPublisher publisher;
+	
 	@GetMapping
 	public List<Categoria> listar() {
 				
 		return categoriaRepository.findAll();	
 		
 	}
+
 	
 	@PostMapping
-	public ResponseEntity<Categoria> criar(@RequestBody Categoria categoria, HttpServletResponse response) {
+	public ResponseEntity<Categoria> criar(@Valid @RequestBody Categoria categoria, HttpServletResponse response) {
 		
 		Categoria categoriaSalva = categoriaRepository.save(categoria);
 		
-		//INFORMANDO ONDE CONSIGO ENCONTRAR O RECURSO CRIADO NO BANCO
-		URI uri = ServletUriComponentsBuilder.fromCurrentRequestUri().path("/{codigo}")
-				.buildAndExpand(categoriaSalva.getCodigo()).toUri();
-		response.setHeader("Location", uri.toASCIIString());
+		publisher.publishEvent(new RecursoCriadoEvent(this, response, categoriaSalva.getCodigo()));
 		
-		return ResponseEntity.created(uri).body(categoriaSalva); //RETORNO AO NAVEGADOR E NO BODY
+		return ResponseEntity.status(HttpStatus.CREATED).body(categoriaSalva); //RETORNO AO NAVEGADOR E NO BODY
 	}
 	
 	@GetMapping("/{codigo}")
